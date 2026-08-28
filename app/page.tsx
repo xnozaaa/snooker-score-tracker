@@ -5,11 +5,13 @@ import { useEffect, useMemo, useState } from 'react';
 type PlayerId = 'AA' | 'JK' | 'NH' | 'NA';
 type TeamId = 'gold' | 'green';
 type ShotKind = 'fluke' | 'frameBallFluke';
+type BreakBallId = 'red' | 'yellow' | 'green' | 'brown' | 'blue' | 'pink' | 'black';
 
 type BreakEntry = {
   id: string;
   playerId: PlayerId;
   points: number;
+  balls?: BreakBallId[];
   createdAt: number;
 };
 
@@ -44,6 +46,15 @@ type TrackerData = {
 };
 
 const PLAYER_IDS: PlayerId[] = ['AA', 'JK', 'NH', 'NA'];
+const BREAK_BALLS = [
+  { id: 'red', name: 'Red', points: 1 },
+  { id: 'yellow', name: 'Yellow', points: 2 },
+  { id: 'green', name: 'Green', points: 3 },
+  { id: 'brown', name: 'Brown', points: 4 },
+  { id: 'blue', name: 'Blue', points: 5 },
+  { id: 'pink', name: 'Pink', points: 6 },
+  { id: 'black', name: 'Black', points: 7 },
+] as const;
 const TEAM_PLAYERS: Record<TeamId, PlayerId[]> = {
   gold: ['AA', 'JK'],
   green: ['NH', 'NA'],
@@ -105,6 +116,7 @@ export default function Home() {
   const [data, setData] = useState<TrackerData>(EMPTY_DATA);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerId>('AA');
+  const [currentBalls, setCurrentBalls] = useState<BreakBallId[]>([]);
   const [breakInput, setBreakInput] = useState('');
   const [manualPlayer, setManualPlayer] = useState<PlayerId>('AA');
   const [manualInput, setManualInput] = useState('');
@@ -155,7 +167,7 @@ export default function Home() {
       id: entry.id,
       createdAt: entry.createdAt,
       playerId: entry.playerId,
-      label: `${entry.points} break`,
+      label: `${entry.points} break${entry.balls?.length ? ` · ${entry.balls.length} balls` : ''}`,
       tone: 'break',
     }));
     const shots = activeFrame.shots.map((entry) => ({
@@ -184,21 +196,62 @@ export default function Home() {
     window.setTimeout(() => setNotice(''), 2400);
   }
 
-  function addBreak() {
-    const points = Number(breakInput);
+  function saveBreak(points: number, balls?: BreakBallId[]) {
     if (!Number.isInteger(points) || points < 1 || points > 147) {
       showNotice('Enter a whole break from 1 to 147.');
       return;
     }
-    const entry: BreakEntry = { id: id(), playerId: selectedPlayer, points, createdAt: Date.now() };
+    const entry: BreakEntry = {
+      id: id(),
+      playerId: selectedPlayer,
+      points,
+      balls: balls?.length ? [...balls] : undefined,
+      createdAt: Date.now(),
+    };
     updateSession((current) => ({
       ...current,
       frames: current.frames.map((frame) =>
         frame.id === activeFrame.id ? { ...frame, breaks: [...frame.breaks, entry] } : frame,
       ),
     }));
-    setBreakInput('');
     showNotice(`${data.players[selectedPlayer]} · ${points} break added`);
+  }
+
+  function addBall(ballId: BreakBallId) {
+    const ball = BREAK_BALLS.find((item) => item.id === ballId)!;
+    const nextTotal = currentBalls.reduce(
+      (total, currentBallId) => total + BREAK_BALLS.find((item) => item.id === currentBallId)!.points,
+      ball.points,
+    );
+    if (nextTotal > 147) {
+      showNotice('The current break cannot go above 147.');
+      return;
+    }
+    setCurrentBalls((current) => [...current, ballId]);
+    if ('vibrate' in navigator) navigator.vibrate(10);
+  }
+
+  function saveBuiltBreak() {
+    const points = currentBalls.reduce(
+      (total, ballId) => total + BREAK_BALLS.find((item) => item.id === ballId)!.points,
+      0,
+    );
+    if (!points) {
+      showNotice('Tap a ball to start the break.');
+      return;
+    }
+    saveBreak(points, currentBalls);
+    setCurrentBalls([]);
+  }
+
+  function addManualBreak() {
+    const points = Number(breakInput);
+    if (!Number.isInteger(points) || points < 1 || points > 147) {
+      showNotice('Enter a whole break from 1 to 147.');
+      return;
+    }
+    saveBreak(points);
+    setBreakInput('');
   }
 
   function logShot(kind: ShotKind) {
@@ -244,6 +297,7 @@ export default function Home() {
         emptyFrame(activeFrame.number + 1),
       ],
     }));
+    setCurrentBalls([]);
     showNotice(`Frame ${activeFrame.number} saved`);
   }
 
@@ -276,6 +330,8 @@ export default function Home() {
   }
 
   function chooseDate(dateKey: string) {
+    if (!dateKey) return;
+    setCurrentBalls([]);
     setSelectedDate(dateKey);
     setData((current) =>
       current.sessions[dateKey]
@@ -287,6 +343,7 @@ export default function Home() {
   function resetDay() {
     if (!window.confirm(`Clear every entry for ${formatDay(selectedDate)}?`)) return;
     updateSession(() => emptySession());
+    setCurrentBalls([]);
     showNotice('Day cleared');
   }
 
@@ -310,6 +367,10 @@ export default function Home() {
   const greenScore = teamScore(activeFrame, 'green');
   const flukeTotal = session.frames.reduce((total, frame) => total + frame.shots.length, 0);
   const topBreak = highBreaks[0];
+  const currentBreakTotal = currentBalls.reduce(
+    (total, ballId) => total + BREAK_BALLS.find((ball) => ball.id === ballId)!.points,
+    0,
+  );
 
   return (
     <main className="app-shell">
@@ -383,23 +444,61 @@ export default function Home() {
             })}
           </div>
 
-          <div className="entry-row">
-            <label className="break-field">
-              <span>Break score</span>
-              <input
-                inputMode="numeric"
-                pattern="[0-9]*"
-                min="1"
-                max="147"
-                placeholder="0"
-                value={breakInput}
-                onChange={(event) => setBreakInput(event.target.value.replace(/\D/g, '').slice(0, 3))}
-                onKeyDown={(event) => event.key === 'Enter' && addBreak()}
-                aria-label="Break score"
-              />
-            </label>
-            <button className="primary-button" type="button" onClick={addBreak}>Add break</button>
+          <div className="break-builder">
+            <div className="break-readout">
+              <div>
+                <span className="action-label">Current break · {data.players[selectedPlayer] || selectedPlayer}</span>
+                <strong>{currentBreakTotal}</strong>
+              </div>
+              <div className="ball-sequence" aria-label={`${currentBalls.length} balls in current break`}>
+                {currentBalls.length ? currentBalls.map((ballId, index) => (
+                  <i className={`sequence-ball ${ballId}`} key={`${ballId}-${index}`} title={BREAK_BALLS.find((ball) => ball.id === ballId)!.name} />
+                )) : <span>Tap each potted ball below</span>}
+              </div>
+            </div>
+
+            <div className="ball-pad" aria-label="Snooker ball buttons">
+              {BREAK_BALLS.map((ball) => (
+                <button
+                  className="score-ball"
+                  key={ball.name}
+                  type="button"
+                  onClick={() => addBall(ball.id)}
+                  aria-label={`Add ${ball.name}, ${ball.points} point${ball.points === 1 ? '' : 's'}`}
+                >
+                  <span className={`ball-face ${ball.id}`}>{ball.points}</span>
+                  <small>{ball.name}</small>
+                </button>
+              ))}
+            </div>
+
+            <div className="break-actions">
+              <button type="button" onClick={() => setCurrentBalls((current) => current.slice(0, -1))} disabled={!currentBalls.length}>Undo ball</button>
+              <button type="button" onClick={() => setCurrentBalls([])} disabled={!currentBalls.length}>Clear</button>
+              <button className="primary-button" type="button" onClick={saveBuiltBreak}>Save {currentBreakTotal || ''} break</button>
+            </div>
           </div>
+
+          <details className="manual-score-entry">
+            <summary>Enter a break total manually</summary>
+            <div className="entry-row">
+              <label className="break-field">
+                <span>Break score</span>
+                <input
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  min="1"
+                  max="147"
+                  placeholder="0"
+                  value={breakInput}
+                  onChange={(event) => setBreakInput(event.target.value.replace(/\D/g, '').slice(0, 3))}
+                  onKeyDown={(event) => event.key === 'Enter' && addManualBreak()}
+                  aria-label="Break score"
+                />
+              </label>
+              <button className="secondary-save-button" type="button" onClick={addManualBreak}>Add break</button>
+            </div>
+          </details>
 
           <div className="shot-actions">
             <div>
