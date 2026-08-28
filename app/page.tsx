@@ -22,11 +22,20 @@ type ShotEntry = {
   createdAt: number;
 };
 
+type FoulEntry = {
+  id: string;
+  offenderId: PlayerId;
+  awardedTeam: TeamId;
+  points: 4 | 5 | 6 | 7;
+  createdAt: number;
+};
+
 type Frame = {
   id: string;
   number: number;
   breaks: BreakEntry[];
   shots: ShotEntry[];
+  fouls?: FoulEntry[];
   winner?: TeamId;
   closedAt?: number;
 };
@@ -55,6 +64,7 @@ const BREAK_BALLS = [
   { id: 'pink', name: 'Pink', points: 6 },
   { id: 'black', name: 'Black', points: 7 },
 ] as const;
+const FOUL_POINTS = [4, 5, 6, 7] as const;
 const TEAM_PLAYERS: Record<TeamId, PlayerId[]> = {
   gold: ['AA', 'JK'],
   green: ['NH', 'NA'],
@@ -73,7 +83,7 @@ function localDateKey(date = new Date()) {
 }
 
 function emptyFrame(number: number): Frame {
-  return { id: id(), number, breaks: [], shots: [] };
+  return { id: id(), number, breaks: [], shots: [], fouls: [] };
 }
 
 function emptySession(): DaySession {
@@ -101,9 +111,13 @@ function formatDay(dateKey: string) {
 }
 
 function teamScore(frame: Frame, team: TeamId) {
-  return frame.breaks
+  const breakPoints = frame.breaks
     .filter((entry) => TEAM_PLAYERS[team].includes(entry.playerId))
     .reduce((total, entry) => total + entry.points, 0);
+  const foulPoints = (frame.fouls ?? [])
+    .filter((entry) => entry.awardedTeam === team)
+    .reduce((total, entry) => total + entry.points, 0);
+  return breakPoints + foulPoints;
 }
 
 function playerScore(frame: Frame, playerId: PlayerId) {
@@ -166,19 +180,28 @@ export default function Home() {
     const breaks = activeFrame.breaks.map((entry) => ({
       id: entry.id,
       createdAt: entry.createdAt,
-      playerId: entry.playerId,
+      actor: data.players[entry.playerId] || entry.playerId,
       label: `${entry.points} break${entry.balls?.length ? ` · ${entry.balls.length} balls` : ''}`,
       tone: 'break',
     }));
     const shots = activeFrame.shots.map((entry) => ({
       id: entry.id,
       createdAt: entry.createdAt,
-      playerId: entry.playerId,
+      actor: data.players[entry.playerId] || entry.playerId,
       label: entry.kind === 'fluke' ? 'Fluke' : 'Crucial frame-ball fluke',
       tone: entry.kind,
     }));
-    return [...breaks, ...shots].sort((a, b) => b.createdAt - a.createdAt);
-  }, [activeFrame]);
+    const fouls = (activeFrame.fouls ?? []).map((entry) => ({
+      id: entry.id,
+      createdAt: entry.createdAt,
+      actor: TEAM_PLAYERS[entry.awardedTeam]
+        .map((playerId) => data.players[playerId] || playerId)
+        .join(' / '),
+      label: `Awarded ${entry.points} foul points`,
+      tone: 'foul',
+    }));
+    return [...breaks, ...shots, ...fouls].sort((a, b) => b.createdAt - a.createdAt);
+  }, [activeFrame, data.players]);
 
   function updateSession(change: (current: DaySession) => DaySession) {
     if (!selectedDate) return;
@@ -219,7 +242,7 @@ export default function Home() {
 
   function addBall(ballId: BreakBallId) {
     const ball = BREAK_BALLS.find((item) => item.id === ballId)!;
-    const nextTotal = currentBalls.reduce(
+    const nextTotal = currentBalls.reduce<number>(
       (total, currentBallId) => total + BREAK_BALLS.find((item) => item.id === currentBallId)!.points,
       ball.points,
     );
@@ -232,7 +255,7 @@ export default function Home() {
   }
 
   function saveBuiltBreak() {
-    const points = currentBalls.reduce(
+    const points = currentBalls.reduce<number>(
       (total, ballId) => total + BREAK_BALLS.find((item) => item.id === ballId)!.points,
       0,
     );
@@ -265,6 +288,30 @@ export default function Home() {
     showNotice(kind === 'fluke' ? 'Fluke logged' : 'Crucial frame-ball fluke logged');
   }
 
+  function logFoul(points: 4 | 5 | 6 | 7) {
+    const offenderTeam: TeamId = TEAM_PLAYERS.gold.includes(selectedPlayer) ? 'gold' : 'green';
+    const awardedTeam: TeamId = offenderTeam === 'gold' ? 'green' : 'gold';
+    const entry: FoulEntry = {
+      id: id(),
+      offenderId: selectedPlayer,
+      awardedTeam,
+      points,
+      createdAt: Date.now(),
+    };
+    updateSession((current) => ({
+      ...current,
+      frames: current.frames.map((frame) =>
+        frame.id === activeFrame.id
+          ? { ...frame, fouls: [...(frame.fouls ?? []), entry] }
+          : frame,
+      ),
+    }));
+    const awardedLabel = TEAM_PLAYERS[awardedTeam]
+      .map((playerId) => data.players[playerId] || playerId)
+      .join(' / ');
+    showNotice(`${points} foul points awarded to ${awardedLabel}`);
+  }
+
   function undoLastEvent() {
     const last = liveEvents[0];
     if (!last) {
@@ -279,6 +326,7 @@ export default function Home() {
               ...frame,
               breaks: frame.breaks.filter((entry) => entry.id !== last.id),
               shots: frame.shots.filter((entry) => entry.id !== last.id),
+              fouls: (frame.fouls ?? []).filter((entry) => entry.id !== last.id),
             }
           : frame,
       ),
@@ -366,11 +414,20 @@ export default function Home() {
   const goldScore = teamScore(activeFrame, 'gold');
   const greenScore = teamScore(activeFrame, 'green');
   const flukeTotal = session.frames.reduce((total, frame) => total + frame.shots.length, 0);
+  const foulPointsTotal = session.frames.reduce(
+    (total, frame) => total + (frame.fouls ?? []).reduce((sum, entry) => sum + entry.points, 0),
+    0,
+  );
   const topBreak = highBreaks[0];
-  const currentBreakTotal = currentBalls.reduce(
+  const currentBreakTotal = currentBalls.reduce<number>(
     (total, ballId) => total + BREAK_BALLS.find((ball) => ball.id === ballId)!.points,
     0,
   );
+  const selectedPlayerTeam: TeamId = TEAM_PLAYERS.gold.includes(selectedPlayer) ? 'gold' : 'green';
+  const foulAwardTeam: TeamId = selectedPlayerTeam === 'gold' ? 'green' : 'gold';
+  const foulAwardLabel = TEAM_PLAYERS[foulAwardTeam]
+    .map((playerId) => data.players[playerId] || playerId)
+    .join(' / ');
 
   return (
     <main className="app-shell">
@@ -411,6 +468,7 @@ export default function Home() {
         <div><span>Frames played</span><b>{completedFrames.length}</b></div>
         <div><span>High break</span><b>{topBreak?.points ?? '—'}</b></div>
         <div><span>Fluke events</span><b>{flukeTotal}</b></div>
+        <div><span>Foul points</span><b>{foulPointsTotal}</b></div>
         <button type="button" onClick={undoLastEvent} disabled={!liveEvents.length}>Undo last entry</button>
       </section>
 
@@ -513,6 +571,20 @@ export default function Home() {
             </button>
           </div>
 
+          <div className="foul-actions">
+            <div>
+              <span className="action-label">Foul by {data.players[selectedPlayer] || selectedPlayer}</span>
+              <p>Points are awarded to {foulAwardLabel}.</p>
+            </div>
+            <div className="foul-point-buttons" aria-label="Award foul points">
+              {FOUL_POINTS.map((points) => (
+                <button key={points} type="button" onClick={() => logFoul(points)} aria-label={`Award ${points} foul points to ${foulAwardLabel}`}>
+                  +{points}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="frame-finish">
             <div>
               <p className="eyebrow">Finish frame {activeFrame.number}</p>
@@ -604,7 +676,7 @@ export default function Home() {
               {liveEvents.map((event) => (
                 <li key={event.id}>
                   <span className={`event-mark ${event.tone}`} aria-hidden="true" />
-                  <b>{data.players[event.playerId] || event.playerId}</b>
+                  <b>{event.actor}</b>
                   <span>{event.label}</span>
                 </li>
               ))}

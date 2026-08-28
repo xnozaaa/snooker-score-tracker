@@ -137,7 +137,7 @@ h2 { font-size: clamp(1.45rem, 3.2vw, 2rem); letter-spacing: -.04em; }
 
 .stat-strip {
   display: grid;
-  grid-template-columns: repeat(3, 1fr) auto;
+  grid-template-columns: repeat(4, 1fr) auto;
   align-items: stretch;
   gap: 1px;
   overflow: hidden;
@@ -273,6 +273,31 @@ h2 { font-size: clamp(1.45rem, 3.2vw, 2rem); letter-spacing: -.04em; }
 .ball-icon.yellow { background: #ebd54a; }
 .ball-icon.black { background: #0b0b0b; }
 
+.foul-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  border: 1px solid rgba(255, 107, 107, .2);
+  border-radius: 16px;
+  background: rgba(255, 107, 107, .035);
+  padding: 13px;
+}
+.foul-actions p { margin-top: 3px; color: var(--muted); font-size: .7rem; }
+.foul-point-buttons { display: grid; grid-template-columns: repeat(4, 52px); gap: 7px; }
+.foul-point-buttons button {
+  min-height: 48px;
+  border: 1px solid rgba(255, 107, 107, .28);
+  border-radius: 12px;
+  background: #221719;
+  color: #ff9e9e;
+  font-weight: 900;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.foul-point-buttons button:active { transform: scale(.95); }
+
 .frame-finish {
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -319,11 +344,12 @@ h2 { font-size: clamp(1.45rem, 3.2vw, 2rem); letter-spacing: -.04em; }
 .lower-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
 .activity-list, .frame-list { display: grid; gap: 1px; overflow: hidden; margin: 18px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--line); list-style: none; }
 .activity-list { max-height: 270px; overflow-y: auto; }
-.activity-list li { display: grid; grid-template-columns: auto 60px 1fr; align-items: center; gap: 9px; background: #101412; padding: 11px 13px; font-size: .77rem; }
+.activity-list li { display: grid; grid-template-columns: auto minmax(62px, 110px) 1fr; align-items: center; gap: 9px; background: #101412; padding: 11px 13px; font-size: .77rem; }
 .activity-list li > span:last-child { color: var(--muted); }
 .event-mark { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
 .event-mark.fluke { background: #ead647; }
 .event-mark.frameBallFluke { background: #0a0a0a; box-shadow: 0 0 0 1px #8c978f; }
+.event-mark.foul { background: var(--red); }
 
 .frame-list li { display: grid; grid-template-columns: 1fr auto 90px; align-items: center; gap: 12px; background: #101412; padding: 12px 14px; font-size: .77rem; }
 .frame-list b { font-size: .9rem; }
@@ -366,7 +392,7 @@ footer { display: flex; justify-content: space-between; gap: 16px; padding: 22px
   .workspace-grid { grid-template-columns: 1fr; }
   .side-stack { grid-template-columns: 1fr 1fr; }
   .rules-card { align-self: start; }
-  .stat-strip { grid-template-columns: repeat(3, 1fr); }
+  .stat-strip { grid-template-columns: repeat(4, 1fr); }
   .stat-strip button { grid-column: 1 / -1; padding: 11px; }
   .settings-grid { grid-template-columns: repeat(2, 1fr); }
   .danger-button { grid-column: 1 / -1; }
@@ -382,7 +408,7 @@ footer { display: flex; justify-content: space-between; gap: 16px; padding: 22px
   .frame-status { padding: 0 9px; }
   .frame-status b { font-size: 1.1rem; }
   .frame-status small { display: none; }
-  .stat-strip { grid-template-columns: 1fr 1fr 1fr; }
+  .stat-strip { grid-template-columns: 1fr 1fr; }
   .stat-strip > div { display: block; padding: 11px 9px; text-align: center; }
   .stat-strip span, .stat-strip b { display: block; }
   .stat-strip b { margin-top: 4px; }
@@ -405,6 +431,9 @@ footer { display: flex; justify-content: space-between; gap: 16px; padding: 22px
   .shot-actions { grid-template-columns: 1fr 1fr; }
   .shot-actions > div { grid-column: 1 / -1; }
   .fluke-button, .crucial-button { padding: 11px 8px; }
+  .foul-actions { grid-template-columns: 1fr; }
+  .foul-point-buttons { grid-template-columns: repeat(4, 1fr); }
+  .foul-point-buttons button { min-height: 52px; }
   .frame-finish { grid-template-columns: 1fr 1fr; }
   .frame-finish > div { grid-column: 1 / -1; }
   .winner-button { min-width: 0; }
