@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { LEGACY_ARCHIVE } from './legacy-archive';
-
 type PlayerId = 'AA' | 'JK' | 'NH' | 'NA';
 type TeamId = 'gold' | 'green';
 type ShotKind = 'fluke' | 'frameBallFluke';
@@ -71,7 +69,8 @@ const TEAM_PLAYERS: Record<TeamId, PlayerId[]> = {
   gold: ['AA', 'JK'],
   green: ['NH', 'NA'],
 };
-const STORAGE_KEY = 'digital-nuggy-book-v1';
+const STORAGE_KEY = 'digital-nuggy-book-v2';
+const RETIRED_STORAGE_KEYS = ['digital-nuggy-book-v1'];
 
 function id() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -143,6 +142,7 @@ export default function Home() {
     const today = localDateKey();
     let next = EMPTY_DATA;
     try {
+      RETIRED_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
       const stored = window.localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored) as TrackerData;
@@ -751,64 +751,14 @@ export default function Home() {
       <section className="archive-card panel" id="past-games">
         <div className="section-heading archive-heading">
           <div>
-            <p className="eyebrow">Season 4 archive</p>
+            <p className="eyebrow">Clean archive</p>
             <h2>Past games &amp; all-time records</h2>
           </div>
-          <span>{LEGACY_ARCHIVE.totals.matches} matches · {LEGACY_ARCHIVE.totals.frames} frames</span>
+          <span>{savedDays.length} saved {savedDays.length === 1 ? 'day' : 'days'}</span>
         </div>
 
-        <div className="archive-kpis" aria-label="Season 4 records">
-          <div>
-            <span>Match record</span>
-            <b>{LEGACY_ARCHIVE.totals.goldMatches} — {LEGACY_ARCHIVE.totals.greenMatches}</b>
-            <small>AA / JK vs NH / NA</small>
-          </div>
-          <div>
-            <span>Frame record</span>
-            <b>{LEGACY_ARCHIVE.totals.goldFrames} — {LEGACY_ARCHIVE.totals.greenFrames}</b>
-            <small>Across {LEGACY_ARCHIVE.totals.frames} frames</small>
-          </div>
-          <div>
-            <span>Best break</span>
-            <b>{LEGACY_ARCHIVE.totals.bestBreak.points}</b>
-            <small>{LEGACY_ARCHIVE.totals.bestBreak.holder}</small>
-          </div>
-          <div>
-            <span>Recorded flukes</span>
-            <b>{LEGACY_ARCHIVE.players.reduce((total, player) => total + player.flukes, 0)}</b>
-            <small>Including {LEGACY_ARCHIVE.players.reduce((total, player) => total + player.frameBallFlukes, 0)} frame-ball flukes</small>
-          </div>
-        </div>
-
-        <div className="archive-overview-grid">
-          <section className="record-panel" aria-labelledby="player-records-title">
-            <div className="subsection-heading">
-              <div>
-                <p className="eyebrow">Workbook totals</p>
-                <h3 id="player-records-title">Player records</h3>
-              </div>
-            </div>
-            <div className="record-table" role="table" aria-label="Season 4 player records">
-              <div className="record-row record-head" role="row">
-                <span role="columnheader">Player</span>
-                <span role="columnheader">Points</span>
-                <span role="columnheader">Avg</span>
-                <span role="columnheader">20+</span>
-                <span role="columnheader">Flukes</span>
-              </div>
-              {LEGACY_ARCHIVE.players.map((player) => (
-                <div className="record-row" role="row" key={player.id}>
-                  <b role="cell">{data.players[player.id] || player.id}</b>
-                  <span role="cell">{player.points.toLocaleString('en-GB')}</span>
-                  <span role="cell">{player.average.toFixed(1)}</span>
-                  <span role="cell">{player.highBreaks20Plus}</span>
-                  <span role="cell">{player.flukes}<small>{player.frameBallFlukes ? ` · ${player.frameBallFlukes} FB` : ''}</small></span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="saved-days-panel" aria-labelledby="saved-days-title">
+        {savedDays.length ? (
+          <section className="saved-days-panel reset-saved-days" aria-labelledby="saved-days-title">
             <div className="subsection-heading">
               <div>
                 <p className="eyebrow">This device</p>
@@ -816,82 +766,28 @@ export default function Home() {
               </div>
               <span>{savedDays.length}</span>
             </div>
-            {savedDays.length ? (
-              <ol className="saved-days-list">
-                {savedDays.map((savedDay) => (
-                  <li key={savedDay.dateKey}>
-                    <button type="button" onClick={() => chooseDate(savedDay.dateKey)}>
-                      <span>
-                        <b>{formatDay(savedDay.dateKey)}</b>
-                        <small>{savedDay.frames} frames · {savedDay.flukes} flukes · {savedDay.foulPoints} foul pts</small>
-                      </span>
-                      <strong>{savedDay.session.frameWins.gold} — {savedDay.session.frameWins.green}</strong>
-                      <em>{savedDay.highBreak || '—'} HB</em>
-                    </button>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="empty-state archive-empty">Finished days recorded in the website will appear here automatically.</p>
-            )}
+            <ol className="saved-days-list">
+              {savedDays.map((savedDay) => (
+                <li key={savedDay.dateKey}>
+                  <button type="button" onClick={() => chooseDate(savedDay.dateKey)}>
+                    <span>
+                      <b>{formatDay(savedDay.dateKey)}</b>
+                      <small>{savedDay.frames} frames · {savedDay.flukes} flukes · {savedDay.foulPoints} foul pts</small>
+                    </span>
+                    <strong>{savedDay.session.frameWins.gold} — {savedDay.session.frameWins.green}</strong>
+                    <em>{savedDay.highBreak || '—'} HB</em>
+                  </button>
+                </li>
+              ))}
+            </ol>
           </section>
-        </div>
-
-        <details className="match-archive">
-          <summary>
-            <span>
-              <b>All {LEGACY_ARCHIVE.matches.length} archived matches</b>
-              <small>Open any match to see every frame and player score.</small>
-            </span>
-            <em>View all</em>
-          </summary>
-          <div className="match-list">
-            {LEGACY_ARCHIVE.matches.toReversed().map((match) => {
-              const flukes = Object.values(match.flukes).reduce<number>((total, count) => total + count, 0);
-              const frameBallFlukes = Object.values(match.frameBallFlukes).reduce<number>((total, count) => total + count, 0);
-              return (
-                <details className="match-card" key={match.number}>
-                  <summary>
-                    <span className={`match-number ${match.winner}`}>#{match.number}</span>
-                    <span className="match-result">
-                      <b>{match.goldFrames} — {match.greenFrames}</b>
-                      <small>{match.winner === 'gold' ? 'AA / JK won' : 'NH / NA won'}</small>
-                    </span>
-                    <span className="match-high-break">
-                      <small>High break</small>
-                      <b>{match.highBreak.holder} · {match.highBreak.points}</b>
-                    </span>
-                    <span className="match-flukes">
-                      <small>Flukes</small>
-                      <b>{flukes}{frameBallFlukes ? ` · ${frameBallFlukes} FB` : ''}</b>
-                    </span>
-                    <em>+</em>
-                  </summary>
-                  <ol className="archive-frame-list">
-                    {match.frames.map((frame) => (
-                      <li key={frame.number}>
-                        <span>Frame {frame.number}</span>
-                        {'forfeit' in frame && frame.forfeit ? (
-                          <b>Forfeit</b>
-                        ) : (
-                          <b>{frame.gold} — {frame.green}</b>
-                        )}
-                        <em className={frame.winner}>{frame.winner === 'gold' ? 'AA / JK' : 'NH / NA'}</em>
-                        {frame.playerScores ? (
-                          <small>
-                            AA {frame.playerScores.AA} · JK {frame.playerScores.JK} · NH {frame.playerScores.NH} · NA {frame.playerScores.NA}
-                          </small>
-                        ) : (
-                          <small>Recorded as a walkover</small>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-                </details>
-              );
-            })}
+        ) : (
+          <div className="database-empty-state">
+            <strong>0</strong>
+            <h3>No games or records saved</h3>
+            <p>The archive is completely empty and ready for the games and scores you send next.</p>
           </div>
-        </details>
+        )}
       </section>
 
       <details className="settings-card panel">

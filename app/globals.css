@@ -381,6 +381,20 @@ h2 { font-size: clamp(1.45rem, 3.2vw, 2rem); letter-spacing: -.04em; }
   padding: clamp(20px, 3.2vw, 32px);
 }
 .archive-heading { align-items: center; }
+.database-empty-state {
+  display: grid;
+  justify-items: center;
+  margin-top: 22px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 18px;
+  background: rgba(0, 0, 0, .12);
+  padding: clamp(30px, 7vw, 62px) 20px;
+  text-align: center;
+}
+.database-empty-state strong { color: #3d4540; font-size: clamp(4rem, 10vw, 6.5rem); line-height: .85; letter-spacing: -.08em; }
+.database-empty-state h3 { margin: 16px 0 7px; font-size: 1.05rem; }
+.database-empty-state p { max-width: 470px; color: var(--muted); font-size: .76rem; line-height: 1.55; }
+.reset-saved-days { margin-top: 20px; }
 .archive-kpis {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
