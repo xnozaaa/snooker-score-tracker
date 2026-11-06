@@ -807,6 +807,7 @@ export default function Home() {
       <footer>
         <span>The Digital Nuggy Book · Season 4</span>
         <span>Fast enough for the next shot.</span>
+        <span className="studio-credit">Created by <a href="https://yulaverse.co.uk/" target="_blank" rel="noopener noreferrer">Yulaverse Studio</a></span>
       </footer>
 
       <div className={`toast ${notice ? 'visible' : ''}`} role="status" aria-live="polite">{notice}</div>
